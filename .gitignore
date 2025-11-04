@@ -1,2 +1,34 @@
-/target
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# Environment files - NEVER COMMIT THESE!
 .env
+.env.backup
+.env.*.local
+
+# Keep example and template files
+!.env.example
+!.env.local
+!.env.development
+!.env.staging
+!.env.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Database
+*.db
+*.sqlite

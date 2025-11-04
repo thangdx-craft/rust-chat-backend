@@ -28,6 +28,7 @@ services:
       DATABASE_URL: postgres://chatuser:chatpass@postgres:5432/chatdb
       JWT_SECRET: your-super-secret-jwt-key-change-this-in-production
       RUST_LOG: debug
+      ENABLE_LOGGING: true
       PORT: 3000
     ports:
       - "3000:3000"

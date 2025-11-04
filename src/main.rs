@@ -45,15 +45,15 @@ async fn main() {
     // Load configuration
     let config = config::Config::from_env().expect("Failed to load configuration");
 
-    tracing::info!("Starting chat backend server...");
+    tracing::info!("🚀 Starting chat backend server in {} mode...", config.environment);
 
     // Establish database connection
     let db = db::establish_connection(&config.database_url)
         .await
         .expect("Failed to connect to database");
 
-    // Initialize services
-    let jwt_service = Arc::new(JwtService::new(&config.jwt_secret));
+    // Initialize services with config
+    let jwt_service = Arc::new(JwtService::new(&config.jwt_secret, config.jwt_expiration_hours));
     let auth_service = Arc::new(AuthService::new(db.clone(), jwt_service.as_ref().clone()));
     let message_service = Arc::new(MessageService::new(db.clone()));
 
@@ -66,11 +66,25 @@ async fn main() {
         rooms: Arc::new(RwLock::new(HashMap::new())),
     };
 
-    // Configure CORS
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+    // Configure CORS based on environment
+    let cors = if config.allow_all_cors() {
+        tracing::info!("CORS: Allowing all origins (development mode)");
+        CorsLayer::new()
+            .allow_origin(Any)
+            .allow_methods(Any)
+            .allow_headers(Any)
+    } else {
+        tracing::info!("CORS: Restricted to specific origins: {:?}", config.cors_origins);
+        use tower_http::cors::AllowOrigin;
+        let origins: Vec<_> = config.cors_origins
+            .iter()
+            .filter_map(|s| s.parse().ok())
+            .collect();
+        CorsLayer::new()
+            .allow_origin(AllowOrigin::list(origins))
+            .allow_methods(Any)
+            .allow_headers(Any)
+    };
 
     // Build application with routes
     let app = Router::new()

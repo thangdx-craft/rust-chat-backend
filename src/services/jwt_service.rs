@@ -13,12 +13,14 @@ pub struct Claims {
 #[derive(Clone)]
 pub struct JwtService {
     secret: String,
+    expiration_hours: i64,
 }
 
 impl JwtService {
-    pub fn new(secret: &str) -> Self {
+    pub fn new(secret: &str, expiration_hours: i64) -> Self {
         Self {
             secret: secret.to_string(),
+            expiration_hours,
         }
     }
     
@@ -32,7 +34,7 @@ impl JwtService {
 
     pub fn generate_token(&self, user_id: i32, email: &str) -> Result<String> {
         let expiration = Utc::now()
-            .checked_add_signed(Duration::hours(24))
+            .checked_add_signed(Duration::hours(self.expiration_hours))
             .expect("valid timestamp")
             .timestamp() as usize;
 
