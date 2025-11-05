@@ -18,6 +18,24 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - chat-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: chat-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - chat-network
 
   chat-backend:
     build:
@@ -25,17 +43,31 @@ services:
       dockerfile: Dockerfile
     container_name: chat-backend
     environment:
+      APP_ENV: local
       DATABASE_URL: postgres://chatuser:chatpass@postgres:5432/chatdb
       JWT_SECRET: your-super-secret-jwt-key-change-this-in-production
+      REDIS_URL: redis://redis:6379
+      REDIS_CACHE_TTL: 3600
+      ENABLE_REDIS: true
       RUST_LOG: debug
       ENABLE_LOGGING: true
       PORT: 3000
+      HOST: 0.0.0.0
     ports:
       - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+    networks:
+      - chat-network
+
+networks:
+  chat-network:
+    driver: bridge
 
 volumes:
   postgres_data:
+  redis_data:

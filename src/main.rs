@@ -12,7 +12,12 @@ use axum::{
     Router,
 };
 use sea_orm::DatabaseConnection;
-use services::{auth_service::AuthService, jwt_service::JwtService, message_service::MessageService};
+use services::{
+    auth_service::AuthService, 
+    jwt_service::JwtService, 
+    message_service::MessageService,
+    redis_service::RedisService,
+};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::{broadcast, RwLock};
 use tower_http::cors::{Any, CorsLayer};
@@ -26,6 +31,7 @@ pub struct AppState {
     pub message_service: Arc<MessageService>,
     pub db: Arc<DatabaseConnection>,
     pub rooms: Arc<RwLock<HashMap<i32, broadcast::Sender<String>>>>,
+    pub redis: Option<Arc<RedisService>>,
 }
 
 #[tokio::main]
@@ -57,6 +63,31 @@ async fn main() {
     let auth_service = Arc::new(AuthService::new(db.clone(), jwt_service.as_ref().clone()));
     let message_service = Arc::new(MessageService::new(db.clone()));
 
+    // Initialize Redis service if enabled
+    let redis = if config.enable_redis {
+        match &config.redis_url {
+            Some(redis_url) => {
+                match RedisService::new(redis_url, config.redis_cache_ttl).await {
+                    Ok(service) => {
+                        tracing::info!("🎯 Redis caching enabled (TTL: {}s)", config.redis_cache_ttl);
+                        Some(Arc::new(service))
+                    }
+                    Err(e) => {
+                        tracing::warn!("⚠️ Failed to connect to Redis: {}. Continuing without cache.", e);
+                        None
+                    }
+                }
+            }
+            None => {
+                tracing::info!("ℹ️  Redis URL not configured. Caching disabled.");
+                None
+            }
+        }
+    } else {
+        tracing::info!("ℹ️  Redis caching disabled by configuration.");
+        None
+    };
+
     // Create unified application state
     let app_state = AppState {
         jwt_service,
@@ -64,6 +95,7 @@ async fn main() {
         message_service,
         db: Arc::new(db),
         rooms: Arc::new(RwLock::new(HashMap::new())),
+        redis,
     };
 
     // Configure CORS based on environment

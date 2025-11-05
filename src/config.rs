@@ -91,6 +91,15 @@ pub struct Config {
     
     /// Enable request logging
     pub enable_logging: bool,
+    
+    /// Redis connection URL (optional)
+    pub redis_url: Option<String>,
+    
+    /// Redis cache TTL in seconds
+    pub redis_cache_ttl: usize,
+    
+    /// Enable Redis caching
+    pub enable_redis: bool,
 }
 
 impl Config {
@@ -153,6 +162,19 @@ impl Config {
             .and_then(|v| v.parse().ok())
             .unwrap_or(!environment.is_production() || true);
 
+        // Redis configuration
+        let redis_url = env::var("REDIS_URL").ok();
+        let enable_redis = redis_url.is_some() && 
+            env::var("ENABLE_REDIS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(true);
+        
+        let redis_cache_ttl = env::var("REDIS_CACHE_TTL")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(300); // Default: 5 minutes
+
         let config = Config {
             environment,
             database_url,
@@ -163,6 +185,9 @@ impl Config {
             max_ws_connections,
             cors_origins,
             enable_logging,
+            redis_url,
+            redis_cache_ttl,
+            enable_redis,
         };
 
         // Log configuration (without secrets)
@@ -174,6 +199,10 @@ impl Config {
         tracing::info!("  Max WS Connections: {}", config.max_ws_connections);
         tracing::info!("  CORS Origins: {:?}", config.cors_origins);
         tracing::info!("  Enable Logging: {}", config.enable_logging);
+        tracing::info!("  Redis Enabled: {}", config.enable_redis);
+        if config.enable_redis {
+            tracing::info!("  Redis Cache TTL: {}s", config.redis_cache_ttl);
+        }
 
         Ok(config)
     }
